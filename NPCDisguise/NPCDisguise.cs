@@ -2,14 +2,15 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using Hooks;
 using Terraria;
+using TerrariaApi.Server;
 using TShockAPI;
+using TShockAPI.Hooks;
 using System.ComponentModel;
 
 namespace NPCDisguise
 {
-	[APIVersion(1, 12)]
+	[ApiVersion(1, 15)]
 	public class NPCDisguise : TerrariaPlugin
     {
 		public override string Name { get { return "NPCDisguise"; } }
@@ -27,45 +28,45 @@ namespace NPCDisguise
 
 		public override void Initialize()
 		{
-			GameHooks.Initialize += onInitialize;
-			NetHooks.SendData += onSendData;
-			NetHooks.GreetPlayer += onGreetPlayer;
-			ServerHooks.Leave += onLeave;
-			GameHooks.Update += onUpdate;
+			ServerApi.Hooks.GameInitialize.Register(this, onInitialize);
+			ServerApi.Hooks.NetSendData.Register(this, onSendData);
+			ServerApi.Hooks.NetGreetPlayer.Register(this, onGreetPlayer);
+			ServerApi.Hooks.ServerLeave.Register(this, onLeave);
+			ServerApi.Hooks.GameUpdate.Register(this, onUpdate);
 		}
 		protected override void Dispose(bool disposing)
 		{
 			if (disposing)
 			{
-				GameHooks.Initialize -= onInitialize;
-				NetHooks.SendData -= onSendData;
-				NetHooks.GreetPlayer -= onGreetPlayer;
-				ServerHooks.Leave -= onLeave;
-				GameHooks.Update -= onUpdate;
+				ServerApi.Hooks.GameInitialize.Deregister(this, onInitialize);
+				ServerApi.Hooks.NetSendData.Deregister(this, onSendData);
+				ServerApi.Hooks.NetGreetPlayer.Deregister(this, onGreetPlayer);
+				ServerApi.Hooks.ServerLeave.Deregister(this, onLeave);
+				ServerApi.Hooks.GameUpdate.Deregister(this, onUpdate);
 			}
 			base.Dispose(disposing);
 		}
 
 		#region Join/Leave
-		public void onGreetPlayer(int who, HandledEventArgs e)
+		public void onGreetPlayer(GreetPlayerEventArgs e)
 		{
 			try
 			{
-				dPlayers[who] = new dPlayer(who);
+				dPlayers[e.Who] = new dPlayer(e.Who);
 			}
 			catch { }
 		}
-		public void onLeave(int who)
+		public void onLeave(LeaveEventArgs e)
 		{
 			try
 			{
-				dPlayers[who] = null;
+				dPlayers[e.Who] = null;
 			}
 			catch { }
 		}
 		#endregion
 
-		void onInitialize()
+		void onInitialize(EventArgs e)
 		{
 			Commands.ChatCommands.Add(new Command("npcdisguise", CMDdisguise, "nd"));
 		}
@@ -107,7 +108,7 @@ namespace NPCDisguise
 		{
 			try
 			{
-				if (e.MsgID == PacketTypes.NpcUpdate)
+				if (e.MsgId == PacketTypes.NpcUpdate)
 				{
 					foreach (var dPly in dPlayers)
 					{
@@ -117,7 +118,7 @@ namespace NPCDisguise
 						}
 					}
 				}
-				if (e.MsgID == PacketTypes.PlayerUpdate)
+				if (e.MsgId == PacketTypes.PlayerUpdate)
 				{
 					if (dPlayers[e.ignoreClient].Disguised && dPlayers[e.ignoreClient].NPCIndex > -1)
 					{
@@ -136,7 +137,7 @@ namespace NPCDisguise
 						Main.npc[npcid].directionY = 0;
 						Main.npc[npcid].life = Main.npc[npcid].lifeMax;
 						Main.npc[npcid].netID = dPly.DisguiseNPC;
-						e.MsgID = PacketTypes.NpcUpdate;
+						e.MsgId = PacketTypes.NpcUpdate;
 						e.number =  npcid;
 					}
 				}
@@ -144,7 +145,7 @@ namespace NPCDisguise
 			catch { }
 		}
 		
-		void onUpdate()
+		void onUpdate(EventArgs e)
 		{
 			/*if ((DateTime.UtcNow - LastUpdate).TotalMilliseconds > 999)
 			{
